@@ -10,6 +10,14 @@ category:            Graphics
 build-type:          Simple
 cabal-version:       2.0
 
+
+cabal.project
+-- Custom repository for cardano haskell packages, see
+-- ouroboros-network/CONTRIBUTING for more
+repository cardano-haskell-packages
+  url: https://chap.intersectmbo.org/
+  secure: True
+
 executable MazeGenerator
   main-is:              Main.hs
 
@@ -17,17 +25,20 @@ executable MazeGenerator
                         MazeGenerator
                         RandomGeneration
                         Types
-  
+
   ghc-options:          -Wall
                         -O2 -threaded "-with-rtsopts=-N2"
-  
+
   default-extensions:   LambdaCase
                         MultiWayIf
 
-  build-depends:          base                    >=4.18
+  build-depends:          base                    >=4.17
                         , random                  ^>=1.3
                         , containers
                         , OpenGL                  >=3.0.3
                         , GLUT                    >=2.7.0.16
+                        , trace-dispatcher
+                        , ekg-core
 
   default-language:     Haskell2010
+

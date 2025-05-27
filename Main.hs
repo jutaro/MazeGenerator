@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Main where
 
@@ -11,6 +12,7 @@ import           Graphics.Rendering.OpenGL (GLint, ($=))
 import qualified Graphics.UI.GLUT          as Glut
 import           System.Environment        (getArgs)
 
+import           System.Metrics            as EKG
 
 mazeDims   :: (Int, Int)
 screenDims :: (GLint, GLint)
@@ -18,14 +20,24 @@ screenDims :: (GLint, GLint)
 mazeDims    = (56, 48)            -- empty cells in a maze
 screenDims  = (800, 600)          -- initial window dimensions
 
-
 main :: IO ()
 main = do
     putStrLn "Maze Generator (c) by M.G.Meier 2014-15, 2025\n"
 
     initializeGL screenDims "MazeGenerator"
 
-    appState <- newMVar emptyAppState
+    -- setup tracer
+    let trConfig = emptyTraceConfig
+    trBase <- standardTracer
+    ekgStore <- EKG.newStore
+    trEkg  <- ekgTracer trConfig ekgStore
+    configReflection <- emptyConfigReflection
+    mazeTr <- mkCardanoTracer trBase mempty (Just trEkg) ["Maze"]
+    configureTracers configReflection trConfig [mazeTr]
+    -- finish setting up the tracer
+
+    appState <- newMVar (emptyAppState mazeTr)
+
 
     getArgs >>= \case
         ["--speedtest"] ->
@@ -37,17 +49,18 @@ main = do
                 startMainLoop appState
 
         _ -> do
-            showKeyBindings
-            print emptyAppState
-            Glut.displayCallback        $= glutDisplayCallback appState
-            Glut.reshapeCallback        $= Just (glutReshapeCallback appState)
-            Glut.keyboardMouseCallback  $= Just (glutInputCallback appState)
-            delayed 50                  $ generateMaze appState
-            watchAndDispatch appState
-            startMainLoop appState
+                showKeyBindings
+                as <- readMVar appState
+                print as
+                Glut.displayCallback        $= glutDisplayCallback appState
+                Glut.reshapeCallback        $= Just (glutReshapeCallback appState)
+                Glut.keyboardMouseCallback  $= Just (glutInputCallback appState)
+                delayed 50                  $ generateMaze appState
+                watchAndDispatch appState
+                startMainLoop appState
 
   where
-    emptyAppState = initialAppState screenDims mazeDims
+    emptyAppState tr = initialAppState screenDims mazeDims tr
 
     -- this is used to schedule an action ahead of entering the GLUT mainloop
     -- !! there is no return from the mainloop !!
@@ -76,5 +89,5 @@ main = do
                 | asNeedSolve -> solveMaze appState
                 | otherwise   -> pure ()
 
-            -- wait 50ms before polling again    
+            -- wait 50ms before polling again
             threadDelay $ 50 * 1000

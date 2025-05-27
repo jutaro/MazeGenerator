@@ -1,0 +1,23 @@
+
+-- Custom repository for Cardano Haskell packages
+-- See ouroboros-network/CONTRIBUTING for more
+repository cardano-haskell-packages
+  url: https://chap.intersectmbo.org/
+  secure: True
+
+-- Use CHaP packages
+-- This tells Cabal to allow packages from the custom repository
+allow-newer: *
+
+-- Your local package (MazeGenerator) is in this directory
+packages: .
+
+with-compiler: ghc-9.4.8
+
+constraints:  io-sim == 1.5.1.0
+            , strict-stm == 1.5.0.0
+            , io-classes ==1.5.0.0
+            , contra-tracer ==0.1.0.1
+
+
+

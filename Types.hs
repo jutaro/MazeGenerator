@@ -3,6 +3,7 @@ module  Types
         , GenerationBias(..)
         , AppState(..)
         , RenderCommand(..)
+        , MazeTracer(..)
 
         , initialAppState
         , getQuadWH
@@ -20,6 +21,7 @@ import           Control.Concurrent.MVar   as ReExport
 import           Control.Monad             as ReExport
 import           Data.Bool                 as ReExport
 
+import           Cardano.Logging           as ReExport
 
 -- a maze is defined by a list of maze indices [MazeIx].
 -- these refer to all maze fields that are walkable.
@@ -37,6 +39,11 @@ data RenderCommand =
     | RendererQuit
     | RendererIdle
 
+-- | The Tracer for the maze generation process.
+data MazeTracer = GenerateNewMaze
+                | SolveMaze
+                deriving (Show, Eq)
+
 -- application state
 data AppState = AppState
     { asMaze        :: [MazeIx]                                         -- ^ the current maze
@@ -50,7 +57,10 @@ data AppState = AppState
     , asAnimating   :: Bool                                             -- ^ some animation is in progress
     , asSolution    :: Maybe [MazeIx]                                   -- ^ if a solution has been found, remember it
     , asRenderFrame :: RenderCommand -> IO ()                           -- ^ send a render command to GLUT
+    , asTracer      :: Trace IO MazeTracer                                       -- ^ tracer for the maze generation process
     }
+
+
 
 instance Show AppState where
     show as = "AppState -- animate: " ++ show (asShowBuild as) ++ "; bias: " ++ show (asBuildBias as)
@@ -81,8 +91,8 @@ emptyMaze (mazeW, mazeH) =
         , y <- [0 .. mazeH-1]
     ]
 
-initialAppState :: (GLint, GLint) -> (Int, Int) -> AppState
-initialAppState screenDims mazeDims =
+initialAppState :: (GLint, GLint) -> (Int, Int) -> Trace IO MazeTracer -> AppState
+initialAppState screenDims mazeDims tracer =
     AppState
         { asMaze        = emptyMaze mazeDims
         , asDims        = mazeDims
@@ -95,4 +105,5 @@ initialAppState screenDims mazeDims =
         , asAnimating   = False
         , asSolution    = Nothing
         , asRenderFrame = \_ -> pure ()
+        , asTracer      = tracer
         }
