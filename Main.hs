@@ -8,6 +8,7 @@ import           MazeGenerator
 import           Types
 
 import           Control.Concurrent
+import           Data.Map                  as Map
 import           Graphics.Rendering.OpenGL (GLint, ($=))
 import qualified Graphics.UI.GLUT          as Glut
 import           System.Environment        (getArgs)
@@ -28,6 +29,9 @@ main = do
 
     -- setup tracer
     let trConfig = emptyTraceConfig
+                        { tcOptions = Map.fromList
+                            [([], [ConfSeverity (SeverityF (Just Info))])]
+                        }
     trBase <- standardTracer
     ekgStore <- EKG.newStore
     trEkg  <- ekgTracer trConfig ekgStore

@@ -81,6 +81,7 @@ depthFirstSearch buildSnapshot randomFunc neighboursAround maze_ =
 generateMaze :: MVar AppState -> IO ()
 generateMaze appState = do
     AppState {..} <- readMVar appState
+    traceWith asTracer GenerateNewMaze
     let
         -- the neighboring empty maze cells
         neighboursAround (x, y) =

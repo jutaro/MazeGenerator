@@ -22,6 +22,7 @@ import           Control.Monad             as ReExport
 import           Data.Bool                 as ReExport
 
 import           Cardano.Logging           as ReExport
+import           Data.Aeson                ()
 
 -- a maze is defined by a list of maze indices [MazeIx].
 -- these refer to all maze fields that are walkable.
@@ -41,7 +42,6 @@ data RenderCommand =
 
 -- | The Tracer for the maze generation process.
 data MazeTracer = GenerateNewMaze
-                | SolveMaze
                 deriving (Show, Eq)
 
 -- application state
@@ -57,10 +57,23 @@ data AppState = AppState
     , asAnimating   :: Bool                                             -- ^ some animation is in progress
     , asSolution    :: Maybe [MazeIx]                                   -- ^ if a solution has been found, remember it
     , asRenderFrame :: RenderCommand -> IO ()                           -- ^ send a render command to GLUT
-    , asTracer      :: Trace IO MazeTracer                                       -- ^ tracer for the maze generation process
+    , asTracer      :: Trace IO MazeTracer                              -- ^ tracer for the maze generation process
     }
 
+instance LogFormatting MazeTracer where
+    forMachine _detailLevel GenerateNewMaze = mconcat []
+    forHuman GenerateNewMaze = ""
 
+instance MetaTrace MazeTracer where
+    namespaceFor GenerateNewMaze = Namespace [] ["GenerateNew"]
+
+    severityFor (Namespace _ ["GenerateNew"]) _ = Just Info
+    severityFor _ _                             = Nothing
+
+    documentFor (Namespace _ ["GenerateNew"]) = Just "A new maze gets constructed"
+    documentFor _ = Nothing
+
+    allNamespaces = [Namespace [] ["GenerateNew"]]
 
 instance Show AppState where
     show as = "AppState -- animate: " ++ show (asShowBuild as) ++ "; bias: " ++ show (asBuildBias as)
