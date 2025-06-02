@@ -38,9 +38,12 @@ executable MazeGenerator
                         , containers
                         , OpenGL                  >=3.0.3
                         , GLUT                    >=2.7.0.16
+
                         , trace-dispatcher
                         , ekg-core
                         , aeson
+                        , time
+                        , text
 
   default-language:     Haskell2010
 

@@ -29,9 +29,10 @@ main = do
 
     -- setup tracer
     let trConfig = emptyTraceConfig
-                        { tcOptions = Map.fromList
-                            [([], [ConfSeverity (SeverityF (Just Info))])]
-                        }
+            { tcOptions = Map.fromList
+                [([], [ConfSeverity (SeverityF (Just Info))
+                        ,ConfBackend ([Stdout HumanFormatColoured])])]
+            }
     trBase <- standardTracer
     ekgStore <- EKG.newStore
     trEkg  <- ekgTracer trConfig ekgStore

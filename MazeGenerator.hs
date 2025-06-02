@@ -10,6 +10,8 @@ import           Prelude            hiding (rem)
 import           Control.Concurrent
 import qualified Data.Set           as S
 
+import           Data.Time          (diffUTCTime, getCurrentTime)
+
 
 {-
   Source:
@@ -81,7 +83,8 @@ depthFirstSearch buildSnapshot randomFunc neighboursAround maze_ =
 generateMaze :: MVar AppState -> IO ()
 generateMaze appState = do
     AppState {..} <- readMVar appState
-    traceWith asTracer GenerateNewMaze
+    timestampStart <- getCurrentTime
+    traceWith asMazeTracer (GenerateNewMazeStart timestampStart)
     let
         -- the neighboring empty maze cells
         neighboursAround (x, y) =
@@ -104,6 +107,9 @@ generateMaze appState = do
                 (uncurry (*) asDims)
     modifyAppState appState $ \st -> st {asMaze = maze, asAnimating = False}
     asRenderFrame $ RenderFrame asQuadWH Nothing maze
+    timestampEnd <- getCurrentTime
+    let diff = diffUTCTime timestampEnd timestampStart
+    traceWith asMazeTracer (GenerateNewMazeEnd diff)
 
 
 -- animates the algorithm that solves the current maze on display.

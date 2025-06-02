@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../cardano-node/trace-dispatcher"
+		}
+	],
+	"settings": {}
+}

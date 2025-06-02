@@ -22,7 +22,10 @@ import           Control.Monad             as ReExport
 import           Data.Bool                 as ReExport
 
 import           Cardano.Logging           as ReExport
-import           Data.Aeson                ()
+import           Data.Aeson
+import           Data.Text
+import           Data.Time
+
 
 -- a maze is defined by a list of maze indices [MazeIx].
 -- these refer to all maze fields that are walkable.
@@ -41,7 +44,8 @@ data RenderCommand =
     | RendererIdle
 
 -- | The Tracer for the maze generation process.
-data MazeTracer = GenerateNewMaze
+data MazeTracer = GenerateNewMazeStart UTCTime
+                | GenerateNewMazeEnd NominalDiffTime
                 deriving (Show, Eq)
 
 -- application state
@@ -57,23 +61,39 @@ data AppState = AppState
     , asAnimating   :: Bool                                             -- ^ some animation is in progress
     , asSolution    :: Maybe [MazeIx]                                   -- ^ if a solution has been found, remember it
     , asRenderFrame :: RenderCommand -> IO ()                           -- ^ send a render command to GLUT
-    , asTracer      :: Trace IO MazeTracer                              -- ^ tracer for the maze generation process
+    , asMazeTracer  :: Trace IO MazeTracer                              -- ^ tracer for the maze generation process
     }
 
 instance LogFormatting MazeTracer where
-    forMachine _detailLevel GenerateNewMaze = mconcat []
-    forHuman GenerateNewMaze = ""
+    forMachine _detailLevel (GenerateNewMazeStart time)  =
+        mconcat ["timestamp" .= (pack . show) time]
+    forMachine _detailLevel (GenerateNewMazeEnd diffTime) =
+        mconcat ["duration" .= (pack . show) diffTime]
+    forHuman (GenerateNewMazeStart time) =
+        "Start generating new maze time: " <> (pack . show) time
+    forHuman (GenerateNewMazeEnd diffTime) =
+        "End generating new maze duration: " <> (pack . show) diffTime
 
 instance MetaTrace MazeTracer where
-    namespaceFor GenerateNewMaze = Namespace [] ["GenerateNew"]
+    namespaceFor GenerateNewMazeStart {} =
+        Namespace [] ["GenerateNewStart"]
+    namespaceFor GenerateNewMazeEnd {}   =
+        Namespace [] ["GenerateNewEnd"]
 
-    severityFor (Namespace _ ["GenerateNew"]) _ = Just Info
-    severityFor _ _                             = Nothing
+    severityFor (Namespace _ ["GenerateNewStart"]) _ =
+        Just Info
+    severityFor (Namespace _ ["GenerateNewEnd"]) _   =
+        Just Info
+    severityFor _ _                                  =
+        Nothing
 
-    documentFor (Namespace _ ["GenerateNew"]) = Just "A new maze gets constructed"
+    documentFor (Namespace _ ["GenerateNewStart"]) =
+        Just "A new maze gets constructed. Carries the start time"
+    documentFor (Namespace _ ["GenerateNewEnd"]) =
+        Just "A new maze was constructed. Carries the duration of constructing"
     documentFor _ = Nothing
 
-    allNamespaces = [Namespace [] ["GenerateNew"]]
+    allNamespaces = [Namespace [] ["GenerateNewStart", "GenerateNewEnd"]]
 
 instance Show AppState where
     show as = "AppState -- animate: " ++ show (asShowBuild as) ++ "; bias: " ++ show (asBuildBias as)
@@ -118,5 +138,5 @@ initialAppState screenDims mazeDims tracer =
         , asAnimating   = False
         , asSolution    = Nothing
         , asRenderFrame = \_ -> pure ()
-        , asTracer      = tracer
+        , asMazeTracer  = tracer
         }
