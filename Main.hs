@@ -8,18 +8,42 @@ import           MazeGenerator
 import           Types
 
 import           Control.Concurrent
-import           Data.Map                  as Map
-import           Graphics.Rendering.OpenGL (GLint, ($=))
-import qualified Graphics.UI.GLUT          as Glut
-import           System.Environment        (getArgs)
+import           Data.Map                             as Map
+import           Graphics.Rendering.OpenGL            (GLint, ($=))
+import qualified Graphics.UI.GLUT                     as Glut
+import           System.Environment                   (getArgs)
+import qualified System.Metrics                       as EKG
 
-import           System.Metrics            as EKG
+import           Cardano.Logging.Prometheus.TCPServer (runPrometheusSimple)
+
 
 mazeDims   :: (Int, Int)
 screenDims :: (GLint, GLint)
 
 mazeDims    = (56, 48)            -- empty cells in a maze
 screenDims  = (800, 600)          -- initial window dimensions
+
+emptyStatistics :: StatisticsTracer
+emptyStatistics = Statistics 0 0 0.0
+
+calcStats ::
+     StatisticsTracer
+  -> LoggingContext
+  -> MazeTracer
+  -> IO StatisticsTracer
+calcStats Statistics {..} _ (MazeSolutionStep isNewRun) =
+  pure $
+    if isNewRun
+      then Statistics (numRuns + 1) numRecursions
+                      (fromIntegral (numRuns + 1) / fromIntegral numRecursions)
+      else Statistics numRuns (numRecursions + 1)
+                      (fromIntegral numRuns / fromIntegral (numRecursions + 1))
+calcStats stats _ _ = pure stats
+
+withStatistics :: Trace IO StatisticsTracer -> IO (Trace IO MazeTracer)
+withStatistics tr =
+  foldTraceM calcStats emptyStatistics $
+    contramap unfold tr
 
 main :: IO ()
 main = do
@@ -31,17 +55,25 @@ main = do
     let trConfig = emptyTraceConfig
             { tcOptions = Map.fromList
                 [([], [ConfSeverity (SeverityF (Just Info))
-                        ,ConfBackend ([Stdout HumanFormatColoured])])]
+                        ,ConfBackend ([Stdout HumanFormatColoured, EKGBackend])])
+                ]
             }
     trBase <- standardTracer
     ekgStore <- EKG.newStore
     trEkg  <- ekgTracer trConfig ekgStore
     configReflection <- emptyConfigReflection
     mazeTr <- mkCardanoTracer trBase mempty (Just trEkg) ["Maze"]
-    configureTracers configReflection trConfig [mazeTr]
-    -- finish setting up the tracer
 
-    appState <- newMVar (emptyAppState mazeTr)
+    statTr <- mkCardanoTracer trBase mempty (Just trEkg) ["MazeS"]
+    configureTracers configReflection trConfig [statTr]
+
+    mazeTr' <- withStatistics statTr
+    configureTracers configReflection trConfig [mazeTr]
+
+    runPrometheusSimple ekgStore (False, (Just "127.0.0.1"), 3003)
+
+    -- finish setting up the tracer
+    appState <- newMVar (emptyAppState (mazeTr <> mazeTr'))
 
 
     getArgs >>= \case

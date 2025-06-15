@@ -84,7 +84,7 @@ generateMaze :: MVar AppState -> IO ()
 generateMaze appState = do
     AppState {..} <- readMVar appState
     timestampStart <- getCurrentTime
-    traceWith asMazeTracer (GenerateNewMazeStart timestampStart)
+    traceWith asMazeTracer (GenerateNewMazeStart timestampStart asDims)
     let
         -- the neighboring empty maze cells
         neighboursAround (x, y) =
@@ -109,7 +109,7 @@ generateMaze appState = do
     asRenderFrame $ RenderFrame asQuadWH Nothing maze
     timestampEnd <- getCurrentTime
     let diff = diffUTCTime timestampEnd timestampStart
-    traceWith asMazeTracer (GenerateNewMazeEnd diff)
+    traceWith asMazeTracer (GenerateNewMazeDuration diff)
 
 
 -- animates the algorithm that solves the current maze on display.
@@ -121,6 +121,7 @@ generateMaze appState = do
 solveMaze :: MVar AppState -> IO ()
 solveMaze appState = do
     AppState{..} <- readMVar appState
+    traceWith asMazeTracer (MazeSolutionStep True)
     let
         enter   = (0, 1)                                                   -- punch a hole in the wall bottom left...
         exit    = let (right, upper) = maximum asMaze in (right+1, upper)  -- ...and top right
@@ -132,6 +133,7 @@ solveMaze appState = do
         solveRecursive free sols
             | S.null free || null sols = pure Nothing                   -- conditions on which a maze is unsolvable
             | otherwise = do
+                traceWith asMazeTracer (MazeSolutionStep False)
                 let
                     sols' = concat [ map (:sol) ms
                         | sol@(s:_) <- sols

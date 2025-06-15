@@ -4,6 +4,7 @@ module  Types
         , AppState(..)
         , RenderCommand(..)
         , MazeTracer(..)
+        , StatisticsTracer(..)
 
         , initialAppState
         , getQuadWH
@@ -44,9 +45,106 @@ data RenderCommand =
     | RendererIdle
 
 -- | The Tracer for the maze generation process.
-data MazeTracer = GenerateNewMazeStart UTCTime
-                | GenerateNewMazeEnd NominalDiffTime
-                deriving (Show, Eq)
+data MazeTracer
+  = GenerateNewMazeStart
+      { genStartTime      :: UTCTime
+      , genMazeWidthHight :: (Int, Int)
+      }
+  | GenerateNewMazeDuration
+      { genDuration :: NominalDiffTime }
+  | MazeSolutionStep Bool
+  deriving (Show, Eq)
+
+instance LogFormatting MazeTracer where
+    forMachine _detailLevel (GenerateNewMazeStart time dim)  =
+        mconcat [ "timestamp" .= (pack . show) time
+                , "with" .= (pack . show) (fst dim)
+                , "height" .= (pack . show) (snd dim)]
+    forMachine _detailLevel (GenerateNewMazeDuration diffTime) =
+        mconcat ["duration" .= (pack . show) diffTime]
+    forMachine _detailLevel (MazeSolutionStep _) = mempty
+
+    forHuman (GenerateNewMazeStart time dim) =
+        "Start generating new maze time: " <> (pack . show) time
+        <> " with: " <> (pack . show) (fst dim)
+        <> " height: " <> (pack . show) (snd dim)
+    forHuman (GenerateNewMazeDuration diffTime) =
+        "End generating new maze duration: " <> (pack . show) diffTime
+    forHuman (MazeSolutionStep _) = ""
+
+    asMetrics (MazeSolutionStep False) = [CounterM "solution_steps" (Just 1)]
+    asMetrics _                        = []
+
+instance MetaTrace MazeTracer where
+    namespaceFor GenerateNewMazeStart {} =
+        Namespace [] ["GenerateNewStart"]
+    namespaceFor GenerateNewMazeDuration {}   =
+        Namespace [] ["GenerateNewDuration"]
+    namespaceFor MazeSolutionStep {}   =
+        Namespace [] ["MazeSolutionStep"]
+
+    severityFor (Namespace _ ["GenerateNewStart"]) _ =
+        Just Info
+    severityFor (Namespace _ ["GenerateNewDuration"]) _   =
+        Just Info
+    severityFor (Namespace _ ["MazeSolutionStep"]) _   =
+        Just Debug
+    severityFor _ _                                  =
+        Nothing
+
+    documentFor (Namespace _ ["GenerateNewStart"]) =
+        Just "A new maze gets constructed. Carries the start time"
+    documentFor (Namespace _ ["GenerateNewDuration"]) =
+        Just "A new maze was constructed. Carries the duration of constructing"
+    documentFor _ = Nothing
+
+    metricsDocFor (Namespace _ ["MazeSolutionStep"]) =
+        [ ("solution_steps", "Number of steps for a solution")]
+    metricsDocFor _ = []
+
+    allNamespaces = [Namespace [] ["GenerateNewStart"],
+                     Namespace [] ["GenerateNewDuration"],
+                     Namespace [] ["MazeSolutionStep"]
+                     ]
+
+
+data StatisticsTracer = Statistics
+  { numRuns           :: Int
+  , numRecursions     :: Int
+  , averageRecursions :: Double
+  }
+
+instance LogFormatting StatisticsTracer where
+    forMachine _detailLevel (Statistics runs recursions avg) =
+        mconcat [ "num_runs" .= runs
+                , "num_recursions" .= recursions
+                , "average_recursions" .= avg ]
+    forHuman (Statistics runs recursions avg) =
+        "Runs: " <> pack (show runs)
+        <> ", Recursions: " <> pack (show recursions)
+        <> ", Average Recursions: " <> pack (show avg)
+
+    asMetrics (Statistics runs recursions avg) =
+        [ IntM "num_runs" (fromIntegral runs)
+        , IntM "num_recursions" (fromIntegral recursions)
+        , DoubleM "average_recursions" avg]
+
+instance MetaTrace StatisticsTracer where
+    namespaceFor _ = Namespace [] ["Statistics"]
+
+    severityFor (Namespace _ ["Statistics"]) _ = Just Debug
+    severityFor _ _                            = Nothing
+
+    documentFor (Namespace _ ["Statistics"]) = Just "Statistics about the maze solving"
+    documentFor _ = Nothing
+
+    metricsDocFor (Namespace _ ["Statistics"]) =
+        [ ("num_runs", "Number of runs")
+        , ("num_recursions", "Number of recursions")
+        , ("average_recursions", "Average number of recursions per run") ]
+    metricsDocFor _ = []
+
+    allNamespaces = [Namespace [] ["Statistics"]]
 
 -- application state
 data AppState = AppState
@@ -64,36 +162,6 @@ data AppState = AppState
     , asMazeTracer  :: Trace IO MazeTracer                              -- ^ tracer for the maze generation process
     }
 
-instance LogFormatting MazeTracer where
-    forMachine _detailLevel (GenerateNewMazeStart time)  =
-        mconcat ["timestamp" .= (pack . show) time]
-    forMachine _detailLevel (GenerateNewMazeEnd diffTime) =
-        mconcat ["duration" .= (pack . show) diffTime]
-    forHuman (GenerateNewMazeStart time) =
-        "Start generating new maze time: " <> (pack . show) time
-    forHuman (GenerateNewMazeEnd diffTime) =
-        "End generating new maze duration: " <> (pack . show) diffTime
-
-instance MetaTrace MazeTracer where
-    namespaceFor GenerateNewMazeStart {} =
-        Namespace [] ["GenerateNewStart"]
-    namespaceFor GenerateNewMazeEnd {}   =
-        Namespace [] ["GenerateNewEnd"]
-
-    severityFor (Namespace _ ["GenerateNewStart"]) _ =
-        Just Info
-    severityFor (Namespace _ ["GenerateNewEnd"]) _   =
-        Just Info
-    severityFor _ _                                  =
-        Nothing
-
-    documentFor (Namespace _ ["GenerateNewStart"]) =
-        Just "A new maze gets constructed. Carries the start time"
-    documentFor (Namespace _ ["GenerateNewEnd"]) =
-        Just "A new maze was constructed. Carries the duration of constructing"
-    documentFor _ = Nothing
-
-    allNamespaces = [Namespace [] ["GenerateNewStart", "GenerateNewEnd"]]
 
 instance Show AppState where
     show as = "AppState -- animate: " ++ show (asShowBuild as) ++ "; bias: " ++ show (asBuildBias as)
@@ -140,3 +208,5 @@ initialAppState screenDims mazeDims tracer =
         , asRenderFrame = \_ -> pure ()
         , asMazeTracer  = tracer
         }
+
+
