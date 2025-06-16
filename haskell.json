@@ -1,0 +1,248 @@
+{
+  "1 Types Import": {
+    "prefix": "1live",
+    "body": [
+      "import           Cardano.Logging           as ReExport",
+      "import           Data.Aeson",
+      "import           Data.Text",
+      "import           Data.Time"
+    ],
+    "description": "Common import block for logging types"
+  },
+  "2 Types TracerType": {
+    "prefix": "2live",
+    "body": [
+      "-- | The Tracer for maze.",
+      "data MazeTracer",
+      "  = GenerateNewMazeStart",
+      "      { genStartTime      :: UTCTime",
+      "      , genMazeWidthHight :: (Int, Int)",
+      "      }",
+      "  | GenerateNewMazeDuration",
+      "      { genDuration :: NominalDiffTime }",
+      "  deriving (Show, Eq)"
+    ],
+    "description": "Tracer type definition for maze logging"
+  },
+  "3 LogFormatting instance": {
+    "prefix": "3live",
+    "body": [
+      "instance LogFormatting MazeTracer where",
+      "    forMachine _detailLevel (GenerateNewMazeStart time dim)  =",
+      "        mconcat [ \"timestamp\" .= (pack . show) time",
+      "                , \"with\" .= (pack . show) (fst dim)",
+      "                , \"height\" .= (pack . show) (snd dim)]",
+      "    forMachine _detailLevel (GenerateNewMazeDuration diffTime) =",
+      "        mconcat [\"duration\" .= (pack . show) diffTime]",
+      "    forHuman (GenerateNewMazeStart time dim) =",
+      "        \"Start generating new maze time: \" <> (pack . show) time",
+      "        <> \" with: \" <> (pack . show) (fst dim)",
+      "        <> \" height: \" <> (pack . show) (snd dim)",
+      "",
+      "    forHuman (GenerateNewMazeDuration diffTime) =",
+      "        \"End generating new maze duration: \" <> (pack . show) diffTime"
+    ],
+    "description": "Instance of LogFormatting for MazeTracer"
+  },
+  "4 MetaTrace instance": {
+    "prefix": "4live",
+    "body": [
+      "instance MetaTrace MazeTracer where",
+      "    namespaceFor GenerateNewMazeStart {} =",
+      "        Namespace [] [\"GenerateNewStart\"]",
+      "    namespaceFor GenerateNewMazeDuration {}   =",
+      "        Namespace [] [\"GenerateNewDuration\"]",
+      "",
+      "    severityFor (Namespace _ [\"GenerateNewStart\"]) _ =",
+      "        Just Info",
+      "    severityFor (Namespace _ [\"GenerateNewDuration\"]) _   =",
+      "        Just Info",
+      "    severityFor _ _                                  =",
+      "        Nothing",
+      "",
+      "    documentFor (Namespace _ [\"GenerateNewStart\"]) =",
+      "        Just \"A new maze gets constructed. Carries the start time\"",
+      "    documentFor (Namespace _ [\"GenerateNewDuration\"]) =",
+      "        Just \"A new maze was constructed. Carries the duration of constructing\"",
+      "    documentFor _ = Nothing",
+      "",
+      "    allNamespaces = [Namespace [] [\"GenerateNewStart\"],",
+      "                     Namespace [] [\"GenerateNewDuration\"]",
+      "                     ]"
+    ],
+    "description": "Instance of MetaTrace for MazeTracer"
+  },
+  "5 MazeTracer in Config": {
+    "prefix": "5live",
+    "body": [
+      ", asMazeTracer  :: Trace IO MazeTracer                              -- ^ tracer for the maze generation process"
+    ],
+    "description": "Field for MazeTracer in configuration record"
+  },
+  "6 initialAppState": {
+    "prefix": "6live",
+    "body": [
+      "initialAppState :: (GLint, GLint) -> (Int, Int) -> Trace IO MazeTracer -> AppState",
+      "initialAppState screenDims mazeDims tracer ="
+    ],
+    "description": "Initial state function with MazeTracer input"
+  },
+  "7 tracer setup": {
+    "prefix": "7live",
+    "body": [
+      "-- setup tracer",
+      "let trConfig = emptyTraceConfig",
+      "        { tcOptions = Map.fromList",
+      "            [([], [ConfSeverity (SeverityF (Just Info))",
+      "                    ,ConfBackend ([Stdout HumanFormatColoured, EKGBackend])])",
+      "            ]",
+      "        }",
+      "trBase <- standardTracer",
+      "ekgStore <- EKG.newStore",
+      "trEkg  <- ekgTracer trConfig ekgStore",
+      "configReflection <- emptyConfigReflection",
+      "mazeTr <- mkCardanoTracer trBase mempty (Just trEkg) [\"Maze\"]",
+      "configureTracers configReflection trConfig [mazeTr]"
+    ],
+    "description": "Full tracer setup including EKG and AppState creation"
+  },
+  "8 MazeGenerator import": {
+    "prefix": "8live",
+    "body": [
+      "import           Data.Time          (diffUTCTime, getCurrentTime)"
+    ],
+    "description": "MazeGenerator file: time functions for tracing"
+  },
+  "9 Start time trace": {
+    "prefix": "9live",
+    "body": [
+      "-- Start time trace",
+      "timestampStart <- getCurrentTime",
+      "traceWith asMazeTracer (GenerateNewMazeStart timestampStart)"
+    ],
+    "description": "Emit trace event for start time of maze generation"
+  },
+  "10 Duration trace": {
+    "prefix": "10live",
+    "body": [
+      "-- Duration trace",
+      "timestampEnd <- getCurrentTime",
+      "let diff = diffUTCTime timestampEnd timestampStart",
+      "traceWith asMazeTracer (GenerateNewMazeDuration diff)"
+    ],
+    "description": "Emit trace event for duration of maze generation"
+  },
+  "11 MazeSolutionStep metrics": {
+    "prefix": "11live",
+    "body": [
+      "asMetrics (MazeSolutionStep ) = [CounterM \"solution_steps\" Nothing]",
+      "asMetrics _                   = []"
+    ],
+    "description": "Emit metrics for MazeSolutionStep"
+  },
+  "12 MazeSolutionStep docs": {
+    "prefix": "12live",
+    "body": [
+      "metricsDocFor (Namespace _ [\"MazeSolutionStep\"]) =",
+      "    [ (\"solution_steps\", \"Number of steps for a solution\")]",
+      "metricsDocFor _ = []"
+    ],
+    "description": "Metrics documentation for MazeSolutionStep"
+  },
+  "13 Prometheus setup": {
+    "prefix": "13live",
+    "body": [
+      "runPrometheusSimple ekgStore (False, (Just \"127.0.0.1\"), 3003)"
+    ],
+    "description": "Run Prometheus metrics server"
+  },
+  "14 StatisticsTracer": {
+    "prefix": "14live",
+    "body": [
+      "data StatisticsTracer = Statistics",
+      "  { numRuns           :: Int",
+      "  , numRecursions     :: Int",
+      "  , averageRecursions :: Double",
+      "  }",
+      "",
+      "instance LogFormatting StatisticsTracer where",
+      "    forMachine _detailLevel (Statistics runs recursions avg) =",
+      "        mconcat [ \"num_runs\" .= runs",
+      "                , \"num_recursions\" .= recursions",
+      "                , \"average_recursions\" .= avg ]",
+      "    forHuman (Statistics runs recursions avg) =",
+      "        \"Runs: \" <> pack (show runs)",
+      "        <> \", Recursions: \" <> pack (show recursions)",
+      "        <> \", Average Recursions: \" <> pack (show avg)",
+      "",
+      "    asMetrics (Statistics runs recursions avg) =",
+      "        [ IntM \"num_runs\" (fromIntegral runs)",
+      "        , IntM \"num_recursions\" (fromIntegral recursions)",
+      "        , DoubleM \"average_recursions\" avg]",
+      "",
+      "instance MetaTrace StatisticsTracer where",
+      "    namespaceFor _ = Namespace [] [\"Statistics\"]",
+      "",
+      "    severityFor (Namespace _ [\"Statistics\"]) _ = Just Debug",
+      "    severityFor _ _                            = Nothing",
+      "",
+      "    documentFor (Namespace _ [\"Statistics\"]) = Just \"Statistics about the maze solving\"",
+      "    documentFor _ = Nothing",
+      "",
+      "    metricsDocFor (Namespace _ [\"Statistics\"]) =",
+      "        [ (\"num_runs\", \"Number of runs\")",
+      "        , (\"num_recursions\", \"Number of recursions\")",
+      "        , (\"average_recursions\", \"Average number of recursions per run\") ]",
+      "    metricsDocFor _ = []",
+      "",
+      "    allNamespaces = [Namespace [] [\"Statistics\"]]"
+    ],
+    "description": "Definition and tracing setup for StatisticsTracer"
+  },
+    "15 Live Empty Statistics": {
+    "prefix": "15live",
+    "body": [
+      "emptyStatistics :: StatisticsTracer",
+      "emptyStatistics = Statistics 0 0 0.0"
+    ],
+    "description": "Empty statistics value for initialization"
+  },
+  "16 Live With Statistics": {
+    "prefix": "16live",
+    "body": [
+      "withStatistics :: Trace IO StatisticsTracer -> IO (Trace IO MazeTracer)",
+      "withStatistics tr =",
+      "  foldTraceM calcStats emptyStatistics $",
+      "    contramap unfold tr"
+    ],
+    "description": "Compose a MazeTracer with statistics collection using contravariant mapping and folding"
+  },
+"17 Live Calc Stats": {
+    "prefix": "17live",
+    "body": [
+      "calcStats ::",
+      "     StatisticsTracer",
+      "  -> LoggingContext",
+      "  -> MazeTracer",
+      "  -> IO StatisticsTracer",
+      "calcStats Statistics {..} _ (MazeSolutionStep isNewRun) =",
+      "  pure $",
+      "    if isNewRun",
+      "      then Statistics (numRuns + 1) numRecursions",
+      "                      (fromIntegral (numRuns + 1) / fromIntegral numRecursions)",
+      "      else Statistics numRuns (numRecursions + 1)",
+      "                      (fromIntegral numRuns / fromIntegral (numRecursions + 1))",
+      "calcStats stats _ _ = pure stats"
+    ],
+    "description": "Function to update statistics tracer with each MazeTracer event"
+  },
+  "18 Live Setup Statistics Tracer": {
+    "prefix": "18live",
+    "body": [
+      "statTr <- mkCardanoTracer trBase mempty (Just trEkg) [\"MazeS\"]",
+      "configureTracers configReflection trConfig [statTr]",
+      "mazeTr' <- withStatistics statTr"
+    ],
+    "description": "Setup statistics tracer and compose MazeTracer with it"
+  }
+}
