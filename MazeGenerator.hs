@@ -121,6 +121,7 @@ generateMaze appState = do
 solveMaze :: MVar AppState -> IO ()
 solveMaze appState = do
     AppState{..} <- readMVar appState
+    traceWith asMazeTracer (MazeSolutionStep True)
     let
         enter   = (0, 1)                                                   -- punch a hole in the wall bottom left...
         exit    = let (right, upper) = maximum asMaze in (right+1, upper)  -- ...and top right
@@ -132,6 +133,7 @@ solveMaze appState = do
         solveRecursive free sols
             | S.null free || null sols = pure Nothing                   -- conditions on which a maze is unsolvable
             | otherwise = do
+                traceWith asMazeTracer (MazeSolutionStep False)
                 let
                     sols' = concat [ map (:sol) ms
                         | sol@(s:_) <- sols

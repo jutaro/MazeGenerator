@@ -7,12 +7,13 @@ import           MazeGenerator
 import           Types
 
 import           Control.Concurrent
-import qualified Data.Map                  as Map
-import           Graphics.Rendering.OpenGL (GLint, ($=))
-import qualified Graphics.UI.GLUT          as Glut
-import           System.Environment        (getArgs)
+import qualified Data.Map                             as Map
+import           Graphics.Rendering.OpenGL            (GLint, ($=))
+import qualified Graphics.UI.GLUT                     as Glut
+import           System.Environment                   (getArgs)
 
-import           System.Metrics            as EKG
+import           Cardano.Logging.Prometheus.TCPServer (runPrometheusSimple)
+import           System.Metrics                       as EKG
 
 mazeDims   :: (Int, Int)
 screenDims :: (GLint, GLint)
@@ -28,8 +29,9 @@ main = do
 
     let trConfig = emptyTraceConfig
             { tcOptions = Map.fromList
-                [([], [ConfSeverity (SeverityF (Just Info))
-                        ,ConfBackend ([Stdout HumanFormatColoured])])]
+                [([], [ ConfSeverity (SeverityF (Just Info))
+                      , ConfBackend ([Stdout HumanFormatColoured, EKGBackend])])
+                ]
             }
 
     -- setup tracer
@@ -40,7 +42,7 @@ main = do
     mazeTr <- mkCardanoTracer trBase mempty (Just trEkg) ["Maze"]
     configureTracers configReflection trConfig [mazeTr]
     -- finish setting up the tracer
-
+    _ <- runPrometheusSimple ekgStore (False, (Just "127.0.0.1"), 3003)
     appState <- newMVar (emptyAppState mazeTr)
 
 

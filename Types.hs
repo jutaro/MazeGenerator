@@ -46,6 +46,7 @@ data RenderCommand =
 -- | The Tracer for the maze generation process.
 data MazeTracer = GenerateNewMazeStart UTCTime
                 | GenerateNewMazeEnd NominalDiffTime
+                | MazeSolutionStep Bool
                 deriving (Show, Eq)
 
 -- application state
@@ -69,23 +70,38 @@ instance LogFormatting MazeTracer where
         mconcat ["timestamp" .= (pack . show) time]
     forMachine _detailLevel (GenerateNewMazeEnd diffTime) =
         mconcat ["duration" .= (pack . show) diffTime]
+    forMachine _detailLevel (MazeSolutionStep b) =
+        mconcat ["kind" .= (pack . show) b]
     forHuman (GenerateNewMazeStart time) =
         "Start generating new maze time: " <> (pack . show) time
     forHuman (GenerateNewMazeEnd diffTime) =
         "End generating new maze duration: " <> (pack . show) diffTime
+    forHuman (MazeSolutionStep _) =
+        "Maze solution step"
+
+    asMetrics (MazeSolutionStep False) = [CounterM "solution_steps" (Just 1)]
+    asMetrics _                        = []
 
 instance MetaTrace MazeTracer where
     namespaceFor GenerateNewMazeStart {} =
         Namespace [] ["GenerateNewStart"]
     namespaceFor GenerateNewMazeEnd {}   =
         Namespace [] ["GenerateNewEnd"]
+    namespaceFor MazeSolutionStep {}   =
+        Namespace [] ["MazeSolutionStep"]
 
     severityFor (Namespace _ ["GenerateNewStart"]) _ =
         Just Info
     severityFor (Namespace _ ["GenerateNewEnd"]) _   =
         Just Info
+    severityFor (Namespace _ ["MazeSolutionStep"]) _   =
+        Just Debug
     severityFor _ _                                  =
         Nothing
+
+    metricsDocFor (Namespace _ ["MazeSolutionStep"]) =
+        [ ("solution_steps", "Number of steps for a solution")]
+    metricsDocFor _ = []
 
     documentFor (Namespace _ ["GenerateNewStart"]) =
         Just "A new maze gets constructed. Carries the start time"
@@ -94,7 +110,8 @@ instance MetaTrace MazeTracer where
     documentFor _ = Nothing
 
     allNamespaces = [Namespace [] ["GenerateNewStart"]
-                    ,Namespace [] ["GenerateNewEnd"]]
+                    , Namespace [] ["GenerateNewEnd"]
+                    , Namespace [] ["MazeSolutionStep"]]
 
 instance Show AppState where
     show as = "AppState -- animate: " ++ show (asShowBuild as) ++ "; bias: " ++ show (asBuildBias as)
