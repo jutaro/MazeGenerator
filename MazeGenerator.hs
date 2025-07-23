@@ -84,7 +84,7 @@ generateMaze :: MVar AppState -> IO ()
 generateMaze appState = do
     AppState {..} <- readMVar appState
     timestampStart <- getCurrentTime
-    traceWith asMazeTracer (GenerateNewMazeStart timestampStart)
+    traceWith asMazeTracer (GenerateNewMazeStart timestampStart asDims)
     let
         -- the neighboring empty maze cells
         neighboursAround (x, y) =
@@ -109,7 +109,7 @@ generateMaze appState = do
     asRenderFrame $ RenderFrame asQuadWH Nothing maze
     timestampEnd <- getCurrentTime
     let diff = diffUTCTime timestampEnd timestampStart
-    traceWith asMazeTracer (GenerateNewMazeEnd diff)
+    traceWith asMazeTracer (GenerateNewMazeDuration diff)
 
 
 -- animates the algorithm that solves the current maze on display.

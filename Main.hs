@@ -15,11 +15,34 @@ import           System.Environment                   (getArgs)
 import           Cardano.Logging.Prometheus.TCPServer (runPrometheusSimple)
 import           System.Metrics                       as EKG
 
+
 mazeDims   :: (Int, Int)
 screenDims :: (GLint, GLint)
 
 mazeDims    = (56, 48)            -- empty cells in a maze
 screenDims  = (800, 600)          -- initial window dimensions
+
+emptyStatistics :: StatisticsTracer
+emptyStatistics = Statistics 0 0 0.0
+
+calcStats ::
+     StatisticsTracer
+  -> LoggingContext
+  -> MazeTracer
+  -> IO StatisticsTracer
+calcStats Statistics {..} _ (MazeSolutionStep isNewRun) =
+  pure $
+    if isNewRun
+      then Statistics (numRuns + 1) numRecursions
+                      (fromIntegral (numRuns + 1) / fromIntegral numRecursions)
+      else Statistics numRuns (numRecursions + 1)
+                      (fromIntegral numRuns / fromIntegral (numRecursions + 1))
+calcStats stats _ _ = pure stats
+
+withStatistics :: Trace IO StatisticsTracer -> IO (Trace IO MazeTracer)
+withStatistics tr =
+  foldTraceM calcStats emptyStatistics $
+    contramap unfold tr
 
 main :: IO ()
 main = do
@@ -40,10 +63,17 @@ main = do
     trEkg  <- ekgTracer trConfig ekgStore
     configReflection <- emptyConfigReflection
     mazeTr <- mkCardanoTracer trBase mempty (Just trEkg) ["Maze"]
+
+    statTr <- mkCardanoTracer trBase mempty (Just trEkg) ["MazeS"]
+    configureTracers configReflection trConfig [statTr]
+
+    mazeTr' <- withStatistics statTr
     configureTracers configReflection trConfig [mazeTr]
-    -- finish setting up the tracer
+
     _ <- runPrometheusSimple ekgStore (False, (Just "127.0.0.1"), 3003)
-    appState <- newMVar (emptyAppState mazeTr)
+
+    -- finish setting up the tracer
+    appState <- newMVar (emptyAppState (mazeTr <> mazeTr'))
 
 
     getArgs >>= \case
