@@ -46,8 +46,11 @@ This commit prepares the Maze Generator application for integrating tracing and 
 ---
 
 **Changes made**
+Added a cabal.project file referencing the local trace-dispatcher package from ../cardano-node/trace-dispatcher.
+You have to adjust the path to match your local setup.
 
-* Added a `cabal.project` file referencing the local `trace-dispatcher` package from `../cardano-node/trace-dispatcher`. You have to adopt the path to your installation.
+Or, if you are already using the Cardano ecosystem — for example via Nix — you can import trace-dispatcher from CHaP (the Cardano Haskell Package repository) instead.
+
 * Extended the `build-depends` in the `.cabal` file with the following libraries:
 
   * `trace-dispatcher` – for structured tracing
