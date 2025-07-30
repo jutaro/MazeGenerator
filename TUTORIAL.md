@@ -1,9 +1,34 @@
 
 # 📘 Tracing & Metrics Tutorial with the Maze Generator
 
-Welcome! This tutorial introduces the new tracing system for Cardano by walking through the [Maze Generator](https://github.com/jutaro/MazeGenerator) application. Each commit builds upon the last and is accompanied by a simple explanation here. Our goal is to help you understand how to integrate tracing and metrics into real-world Haskell applications.
+This tutorial introduces the new tracing system for Cardano by walking through the [Maze Generator](https://github.com/jutaro/MazeGenerator) application. Each commit builds upon the last and is accompanied by a simple explanation here. Our goal is to help you understand how to integrate tracing and metrics into real-world Haskell applications.
 
----
+## ✨ Introduction: Why Trace Dispatcher?
+
+Modern systems demand observability — not only to debug errors, but to understand behavior, performance, and intent. For **Cardano**, this led to the creation of **Trace Dispatcher**, a structured tracing and metrics framework layered atop contravariant logging. It offers a unified interface to emit human-readable logs, machine-readable structured events, and even runtime metrics.
+
+Yet despite its power, the Trace Dispatcher can appear daunting at first glance. That’s where this tutorial comes in.
+
+### 🎯 Goals of This Tutorial
+
+1. **For Cardano Developers**:
+   This guide was conceived as an accessible entry point into Cardano's tracing infrastructure. If you're new to the ecosystem or curious about how trace-dispatcher integrates with a real application, this tutorial will light the way.
+
+2. **For Tracing Enthusiasts & System Builders**:
+   Even if you're not building on Cardano, Trace Dispatcher is a general-purpose tool. This tutorial introduces its core concepts — domain-specific tracers, human/machine formatting, severity filtering, metrics, and stateful trace folding — by walking through a clean, isolated use case: the Maze Generator.
+
+### 🧩 Why the Maze Generator?
+
+The [Maze Generator](https://github.com/jutaro/MazeGenerator) is a simple Haskell program that visually constructs and solves mazes. Its clear flow and recursive logic make it an ideal playground to demonstrate:
+
+* Emitting domain-specific trace events
+* Adding timestamps and durations
+* Exporting Prometheus-compatible metrics
+* Folding trace streams into live statistics
+
+Each commit in this tutorial builds incrementally, showing you how to evolve an application from silence to full introspection — in five deliberate, understandable steps.
+
+So whether you're building on Cardano or just seeking a tracing solution that aligns with functional programming elegance, **read on — and trace your way to clarity.**
 
 ## 🔧 Prerequisites
 
